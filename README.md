@@ -59,10 +59,3 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
    ```bash
    node index.js sincronizar
    ```
-
-## Observações
-
-- **API Externa:** Substitua `[nome_da_fonte/URL]` pelas informações reais da API de onde os dados são buscados.
-- **Script SQL:**  Inclua o script SQL para criar o banco de dados e as tabelas ou forneça instruções claras sobre como configurá-los.
-- **Agendamento:** O agendamento da sincronização está comentado no código. Remova os comentários para habilitar. 
-- **Documentação da API:** Inclua a documentação completa da API (endpoints, parâmetros, exemplos de resposta) para facilitar o uso.
