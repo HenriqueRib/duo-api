@@ -40,7 +40,7 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
    DB_NAME=[NOME_DO_BANCO_DE_DADOS]
    ```
 4. **Crie o banco de dados e as tabelas:**
-    - Dunp do banco de dados no arquivo: `[duoimoveis.sql]`
+    - Dump do banco de dados no arquivo: `[duoimoveis.sql]`
 
 ## Utilização
 
