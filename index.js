@@ -1,23 +1,16 @@
+const schedule = require('node-schedule');
 const axios = require('axios');
 const mysql = require('mysql');
-
-const fs = require('fs');
 const path = require('path');
-
-const schedule = require('node-schedule');
-require('dotenv').config();
-
-const express = require('express');
-
 const apiKey = process.env.API_KEY;
 const baseUrl = 'https://clie1076-rest.vistahost.com.br/imoveis';
-
+const express = require('express');
 const app = express();
 const port = 8080;
-
-const yargs = require('yargs/yargs'); // Importe o yargs
-const { hideBin } = require('yargs/helpers'); // Para ocultar os argumentos padrão do node
-
+const fs = require('fs');
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
+require('dotenv').config();
 
 // Configurações do banco de dados do .env
 const dbConfig = {
@@ -54,7 +47,6 @@ async function consultarImovel(codigoImovel) {
   }
 }
 
-//TODO: ARRUMAR CONSULTA DO NOME DO ARQUIVO.
 async function consultarArquivo(nomeArquivo) {
   try {
     const url = `http://localhost:8080/imo_arquivo/${nomeArquivo}`;
@@ -521,14 +513,22 @@ const job = schedule.scheduleJob('0 0 * * *', async () => {
 });
 
 // Configuração do yargs para o comando manual
-yargs(hideBin(process.argv)) // Oculta os argumentos padrão do node
+yargs(hideBin(process.argv))
+  .command(
+    '$0', 
+    'Inicia o servidor e sincroniza os imóveis',
+    () => {},
+    async (argv) => {
+
+    }
+  )
   .command('sincronizar', 'Sincroniza todos os imóveis manualmente', () => {}, async (argv) => {
     console.log('Iniciando sincronização manual pelo terminal...');
     await sincronizarTodosOsImoveis();
     console.log('Sincronização manual concluída!');
-    process.exit(0); // Encerra o processo após a sincronização
+    process.exit(0); 
   })
-  .demandCommand(1) // Exige que pelo menos um comando seja passado
+  .demandCommand(1) // Exige que pelo menos um comando seja passado (opcional)
   .help()
   .argv;
 
