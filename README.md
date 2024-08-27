@@ -1,4 +1,3 @@
-```markdown
 # API de Imóveis - Duo Imóveis
 
 Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost]) com um banco de dados MySQL, disponibilizando endpoints para acesso aos dados.
@@ -67,5 +66,3 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
 - **Script SQL:**  Inclua o script SQL para criar o banco de dados e as tabelas ou forneça instruções claras sobre como configurá-los.
 - **Agendamento:** O agendamento da sincronização está comentado no código. Remova os comentários para habilitar. 
 - **Documentação da API:** Inclua a documentação completa da API (endpoints, parâmetros, exemplos de resposta) para facilitar o uso.
-
-```
