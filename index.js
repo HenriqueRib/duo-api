@@ -7,7 +7,6 @@ const apiKey = process.env.API_KEY;
 const baseUrl = 'https://clie1076-rest.vistahost.com.br/imoveis';
 const express = require('express');
 const app = express();
-const port = 8080;
 const fs = require('fs');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -493,10 +492,7 @@ yargs(hideBin(process.argv))
   .help()
   .argv;
 
-// app.listen(port, () => {
-//   console.log(`Servidor rodando em https://api.duo.imb.br/${port}`);
-// });
-
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Servidor rodando em http://0.0.0.0:${port}`);
-});
+  app.listen(process.env.PORT_APP, '0.0.0.0', () => {
+    console.log(`Servidor rodando em http://0.0.0.0:${process.env.PORT_APP}`);
+    console.log(`Servidor rodando em https://api.duo.imb.br:${process.env.PORT_APP}`); 
+  });
