@@ -33,7 +33,7 @@ pool.getConnection((err, connection) => {
 
 async function consultarImovel(codigoImovel) {
   try {
-    const url = `http://localhost:8080/imo_imovel/${codigoImovel}`;
+    const url = `https://api.duo.imb.br/8080/imo_imovel/${codigoImovel}`;
     const response = await axios.get(url);
     if (response.status === 200) {
       return response.data;
@@ -49,7 +49,7 @@ async function consultarImovel(codigoImovel) {
 
 async function consultarArquivo(nomeArquivo) {
   try {
-    const url = `http://localhost:8080/imo_arquivo/${nomeArquivo}`;
+    const url = `https://api.duo.imb.br/8080/imo_arquivo/${nomeArquivo}`;
     const response = await axios.get(url);
     if (response.status === 200) {
       return response.data;
@@ -98,26 +98,27 @@ async function sincronizarImovel(imovelData) {
     };
 
     const imovelExistente = await consultarImovel(codigoImovel);
-    if (imovelExistente != null) {
-      await pool.query('UPDATE imo_imovel SET ? WHERE id_imovel = ?', [imovel, codigoImovel]);
-      await pool.query('COMMIT');
-      console.log(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel.`);
-      // console.log('Dados inseridos na tabela imo_imovel:', imovel);
-    } else {
-      // Gerar comando INSERT para imo_imovel - Ajuda a identificar campos que faltam
-      // const camposImovel = Object.keys(imovel).join(', ');
-      // const valoresImovel = Object.values(imovel)
-      //   .map(valor => mysql.escape(valor))
-      //   .join(', ');
-      // // const sqlInsertImovel = `INSERT INTO imo_imovel (${camposImovel}) VALUES (${valoresImovel});`;
-      // console.log('Comando INSERT para imo_imovel:', sqlInsertImovel); // Imprime o comando SQL
-      await pool.query('INSERT INTO imo_imovel SET ?', [imovel]);
-      await pool.query('COMMIT');
-      console.log(`INSERT Imóvel ${codigoImovel} inserido na tabela imo_imovel.`);
-      // console.log('Dados inseridos na tabela imo_imovel:', imovel);
-    }
-    await sincronizarImovelValor(imovelData, codigoImovel);
-    await sincronizarImovelFotos(imovelData, codigoImovel, imovel);
+    //TODO: VOLTAR
+    // if (imovelExistente != null) {
+    //   await pool.query('UPDATE imo_imovel SET ? WHERE id_imovel = ?', [imovel, codigoImovel]);
+    //   await pool.query('COMMIT');
+    //   console.log(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel.`);
+    //   // console.log('Dados inseridos na tabela imo_imovel:', imovel);
+    // } else {
+    //   // Gerar comando INSERT para imo_imovel - Ajuda a identificar campos que faltam
+    //   // const camposImovel = Object.keys(imovel).join(', ');
+    //   // const valoresImovel = Object.values(imovel)
+    //   //   .map(valor => mysql.escape(valor))
+    //   //   .join(', ');
+    //   // // const sqlInsertImovel = `INSERT INTO imo_imovel (${camposImovel}) VALUES (${valoresImovel});`;
+    //   // console.log('Comando INSERT para imo_imovel:', sqlInsertImovel); // Imprime o comando SQL
+    //   await pool.query('INSERT INTO imo_imovel SET ?', [imovel]);
+    //   await pool.query('COMMIT');
+    //   console.log(`INSERT Imóvel ${codigoImovel} inserido na tabela imo_imovel.`);
+    //   // console.log('Dados inseridos na tabela imo_imovel:', imovel);
+    // }
+    // await sincronizarImovelValor(imovelData, codigoImovel);
+    // await sincronizarImovelFotos(imovelData, codigoImovel, imovel);
   } catch (error) {
     console.error(`Erro ao sincronizar imóvel ${imovelData.Codigo}:`, error);
     throw error;
@@ -340,7 +341,8 @@ app.get('/imoveis/:codigo', async (req, res) => {
     const response = await axios.get(url);
 
     if (response.status === 200) {
-      await sincronizarImovel(response.data);
+      //TODO: VOLTAR
+      // await sincronizarImovel(response.data);
       res.json({ ...response.data });
     } else {
       const errorMessage = `Erro ao buscar detalhes do imóvel: ${response.status} - ${response.statusText}`;
@@ -401,14 +403,14 @@ app.get('/sincronizar-todos', async (req, res) => {
     console.log('Iniciando sincronização de todos os imóveis...');
 
     // 1. Obter todos os códigos de imóveis
-    const responseCodigos = await axios.get('http://localhost:8080/imoveis_codigos');
+    const responseCodigos = await axios.get('https://api.duo.imb.br/8080/imoveis_codigos');
     const todosCodigos = responseCodigos.data;
     console.log('Códigos dos imóveis:', todosCodigos);
 
     // 2. Sincronizar cada imóvel
     for (const codigo of todosCodigos) {
       console.log(`Sincronizando imóvel ${codigo}...`);
-      const urlImovel = `http://localhost:8080/imoveis/${codigo}`;
+      const urlImovel = `https://api.duo.imb.br/8080/imoveis/${codigo}`;
       const responseImovel = await axios.get(urlImovel);
 
       if (responseImovel.status === 200) {
@@ -444,14 +446,14 @@ async function sincronizarTodosOsImoveis() {
   try {
     console.log('Iniciando sincronização de todos os imóveis...');
     // 1. Obter todos os códigos de imóveis
-    const responseCodigos = await axios.get('http://localhost:8080/imoveis_codigos');
+    const responseCodigos = await axios.get('https://api.duo.imb.br/8080/imoveis_codigos');
     const todosCodigos = responseCodigos.data;
 
     console.log('Códigos dos imóveis:', todosCodigos);
     // 2. Sincronizar cada imóvel
     for (const codigo of todosCodigos) {
       console.log(`Sincronizando imóvel ${codigo}...`);
-      const urlImovel = `http://localhost:8080/imoveis/${codigo}`;
+      const urlImovel = `https://api.duo.imb.br/8080/imoveis/${codigo}`;
       const responseImovel = await axios.get(urlImovel);
 
       if (responseImovel.status === 200) {
@@ -492,5 +494,5 @@ yargs(hideBin(process.argv))
   .argv;
 
 app.listen(port, () => {
-  console.log(`Servidor rodando em http://localhost:${port}`);
+  console.log(`Servidor rodando em https://api.duo.imb.br/${port}`);
 });
