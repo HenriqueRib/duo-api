@@ -493,6 +493,10 @@ yargs(hideBin(process.argv))
   .help()
   .argv;
 
-app.listen(port, () => {
-  console.log(`Servidor rodando em https://api.duo.imb.br/${port}`);
+// app.listen(port, () => {
+//   console.log(`Servidor rodando em https://api.duo.imb.br/${port}`);
+// });
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Servidor rodando em http://0.0.0.0:${port}`);
 });
