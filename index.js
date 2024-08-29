@@ -476,6 +476,7 @@ async function sincronizarTodosOsImoveis() {
 //   }
 // });
 
+// Sincronizar todos de 50 em 50 + o time de pausa 
 app.get('/sincronizar-todos', async (req, res) => {
   try {
     let pagina = 1;
