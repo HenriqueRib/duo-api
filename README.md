@@ -80,3 +80,10 @@ http://api.duo.imb.br:21009/imagens/1599/balneario-moschen-1599-1.jpg
    ```bash
    node index.js sincronizar
    ```
+
+## Comandos SQL 
+
+- **Alteração banco de dados:**
+   ```bash
+   ALTER TABLE imo_imovel ADD COLUMN sincronizado TINYINT(1) DEFAULT 0;
+   ```

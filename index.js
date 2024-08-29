@@ -1,5 +1,5 @@
 require('dotenv').config();
-const schedule = require('node-schedule');
+// const schedule = require('node-schedule');
 const axios = require('axios');
 const mysql = require('mysql');
 const path = require('path');
@@ -27,7 +27,7 @@ pool.getConnection((err, connection) => {
   if (err) {
     console.error('Erro ao conectar ao banco de dados:', err);
   } else {
-    console.log('Conexão com o banco de dados estabelecida!');
+    escreverLog('Conexão com o banco de dados estabelecida!');
     connection.release();
   }
 });
@@ -94,16 +94,21 @@ async function sincronizarImovel(imovelData) {
       gmaps_lat: imovelData.Latitude,
       gmaps_lng: imovelData.Longitude,
       lastmod: new Date().toISOString().slice(0, 10),
+      sincronizado: 1,
       // ativo: 1,
       //TODO:Indentificar COMO saber que deve mostrar ou não no site. Em contato via e-mail
     };
 
     const imovelExistente = await consultarImovel(codigoImovel);
     if (imovelExistente != null) {
+      if (imovelExistente.sincronizado === 1) {
+        escreverLog(`Imóvel ${codigoImovel} já sincronizado. Pulando...`);
+        return;  // Não sincroniza se já sincronizado
+      }
       await pool.query('UPDATE imo_imovel SET ? WHERE id_imovel = ?', [imovel, codigoImovel]);
       await pool.query('COMMIT');
-      console.log(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel.`);
-      // console.log('Dados inseridos na tabela imo_imovel:', imovel);
+      escreverLog(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel.`);
+      // escreverLog('Dados inseridos na tabela imo_imovel:', imovel);
     } else {
       // Gerar comando INSERT para imo_imovel - Ajuda a identificar campos que faltam
       // const camposImovel = Object.keys(imovel).join(', ');
@@ -111,11 +116,11 @@ async function sincronizarImovel(imovelData) {
       //   .map(valor => mysql.escape(valor))
       //   .join(', ');
       // // const sqlInsertImovel = `INSERT INTO imo_imovel (${camposImovel}) VALUES (${valoresImovel});`;
-      // console.log('Comando INSERT para imo_imovel:', sqlInsertImovel); // Imprime o comando SQL
+      // escreverLog('Comando INSERT para imo_imovel:', sqlInsertImovel); // Imprime o comando SQL
       await pool.query('INSERT INTO imo_imovel SET ?', [imovel]);
       await pool.query('COMMIT');
-      console.log(`INSERT Imóvel ${codigoImovel} inserido na tabela imo_imovel.`);
-      // console.log('Dados inseridos na tabela imo_imovel:', imovel);
+      escreverLog(`INSERT Imóvel ${codigoImovel} inserido na tabela imo_imovel.`);
+      // escreverLog('Dados inseridos na tabela imo_imovel:', imovel);
     }
     await sincronizarImovelValor(imovelData, codigoImovel);
     await sincronizarImovelFotos(imovelData, codigoImovel, imovel);
@@ -139,7 +144,7 @@ async function sincronizarImovelValor(imovelData, codigoImovel) {
     };
     // A regra na tabela não precisa verificar pois nela contem a data do ultima
     await pool.query('INSERT INTO imo_valor SET ?', [valor]);
-    console.log(`Valor do imóvel ${codigoImovel} inserido na tabela imo_valor.`);
+    escreverLog(`Valor do imóvel ${codigoImovel} inserido na tabela imo_valor.`);
   } catch (error) {
     console.error(`Erro ao sincronizar valor do imóvel ${codigoImovel}:`, error);
     throw error;
@@ -148,24 +153,20 @@ async function sincronizarImovelValor(imovelData, codigoImovel) {
 
 async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
   try {
-    console.log(`Iniciando sincronização de fotos para o imóvel ${codigoImovel}...`);
-
+    escreverLog(`Iniciando sincronização de fotos para o imóvel ${codigoImovel}...`);
     // Crie a pasta se ela não existir
     const pastaImagens = path.join(__dirname, 'imagens', codigoImovel);
     if (!fs.existsSync(pastaImagens)) {
       fs.mkdirSync(pastaImagens, { recursive: true });
     }
-
     for (const key in imovelData.Foto) {
       const fotoData = imovelData.Foto[key];
-      console.log(`Processando foto ${key}:`, fotoData);
-
+      escreverLog(`Processando foto ${key}:`, fotoData);
       const nomeArquivo = new URL(fotoData.Foto).pathname.split('/').pop();
-      console.log('Nome do arquivo:', nomeArquivo);
+      escreverLog('Nome do arquivo:', nomeArquivo);
       const extensaoArquivo = path.extname(fotoData.Foto);
-      const novoNomeArquivo = `${sanitizarNomeArquivo(imovel.titulo)}-${codigoImovel}-${key}${extensaoArquivo}`; 
-      console.log('Novo nome do arquivo:', novoNomeArquivo);
-
+      const novoNomeArquivo = `${sanitizarNomeArquivo(imovel.titulo)}-${codigoImovel}-${key}${extensaoArquivo}`;
+      escreverLog('Novo nome do arquivo:', novoNomeArquivo);
       const arquivo = {
         id_imovel: codigoImovel,
         arquivo: novoNomeArquivo,
@@ -175,15 +176,12 @@ async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
         id_importado: codigoImovel,
         ordem: key
       };
-
-
       const arquivoExistente = await consultarArquivo(novoNomeArquivo);
       // Faça o download da imagem
       const caminhoArquivo = path.join(pastaImagens, novoNomeArquivo);
       const response = await axios.get(fotoData.Foto, { responseType: 'stream' });
       response.data.pipe(fs.createWriteStream(caminhoArquivo));
-      console.log(`Imagem ${novoNomeArquivo} do imóvel ${codigoImovel} baixada para ${caminhoArquivo}.`);
-
+      escreverLog(`Imagem ${novoNomeArquivo} do imóvel ${codigoImovel} baixada para ${caminhoArquivo}.`);
 
       if (arquivoExistente != null) {
         // 1. Verificar se há dados para atualizar (exemplo simplificado)
@@ -198,9 +196,9 @@ async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
         if (precisaAtualizar) {
           // 2. Executar o UPDATE apenas se houver dados diferentes
           await pool.query('UPDATE imo_arquivo SET ? WHERE id_arquivo = ?', [arquivo, arquivoExistente.id_arquivo]);
-          console.log(`Foto ${arquivo.arquivo} do imóvel ${codigoImovel} atualizada na tabela imo_arquivo.`);
+          escreverLog(`Foto ${arquivo.arquivo} do imóvel ${codigoImovel} atualizada na tabela imo_arquivo.`);
         } else {
-          console.log(`Foto ${arquivo.arquivo} do imóvel ${codigoImovel} já está atualizada.`);
+          escreverLog(`Foto ${arquivo.arquivo} do imóvel ${codigoImovel} já está atualizada.`);
         }
       } else {
         // const camposArquivo = Object.keys(arquivo).join(', ');
@@ -208,12 +206,12 @@ async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
         //   .map(valor => mysql.escape(valor))
         //   .join(', ');
         // const sqlInsertArquivo = `INSERT INTO imo_arquivo (${camposArquivo}) VALUES (${valoresArquivo});`;
-        // console.log('Comando INSERT para imo_arquivo:', sqlInsertArquivo);
+        // escreverLog('Comando INSERT para imo_arquivo:', sqlInsertArquivo);
         // Insere a foto (sem alterações)
         await pool.query('INSERT INTO imo_arquivo SET ?', [arquivo]);
       }
     }
-    console.log(`Sincronização de fotos para o imóvel ${codigoImovel} concluída.`);
+    escreverLog(`Sincronização de fotos para o imóvel ${codigoImovel} concluída.`);
   } catch (error) {
     console.error(`Erro ao sincronizar fotos do imóvel ${codigoImovel}:`, error);
     throw error;
@@ -225,6 +223,30 @@ function sanitizarNomeArquivo(nome) {
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
     .replace(/[^a-z0-9\-]/gi, '-') // Substitui caracteres inválidos por hífen
     .toLowerCase();
+}
+
+function formatarDataParaLog() {
+  const data = new Date();
+  const dia = data.getDate().toString().padStart(2, '0');
+  const mes = (data.getMonth() + 1).toString().padStart(2, '0');
+  const ano = data.getFullYear();
+  return `${dia}${mes}${ano}`;
+}
+
+function escreverLog(mensagem) {
+  const nomeArquivo = path.join(__dirname, 'logs', `log-${formatarDataParaLog()}.log`);
+
+  // Cria o diretório 'logs' se ele não existir
+  if (!fs.existsSync(path.join(__dirname, 'logs'))) {
+    fs.mkdirSync(path.join(__dirname, 'logs'));
+  }
+
+  // Anexa a mensagem ao arquivo de log
+  fs.appendFile(nomeArquivo, `${mensagem}\n`, (err) => {
+    if (err) {
+      console.error('Erro ao escrever no arquivo de log:', err);
+    }
+  });
 }
 
 // Rotas da API
@@ -373,10 +395,8 @@ app.get('/imoveis_codigos', async (req, res) => {
         "order": { "DataAtualizacao": "desc" },
         "paginacao": { "pagina": pagina, "quantidade": 50 }
       };
-
       const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
       const response = await axios.get(url);
-
       if (response.status === 200) {
         const codigos = Object.values(response.data)
           .filter(imovel => typeof imovel === 'object' && imovel.Codigo)
@@ -390,20 +410,18 @@ app.get('/imoveis_codigos', async (req, res) => {
         } else {
           pagina++; // Incrementa a página para a próxima requisição
         }
-        console.log('Page ', pagina);
+        escreverLog('Page ', pagina);
       } else {
         throw new Error(`Erro ao buscar imóveis da API externa: ${response.status} - ${response.statusText}`);
       }
     }
-
-    console.log('Busca de todos os códigos de imóveis concluída!');
+    escreverLog('Busca de todos os códigos de imóveis concluída!');
     res.json(todosCodigos);
   } catch (error) {
     console.error('Erro ao buscar códigos dos imóveis:', error);
     res.status(500).send('Erro interno no servidor');
   }
 });
-
 
 app.get('/campos', async (req, res) => {
   try {
@@ -420,55 +438,55 @@ app.get('/campos', async (req, res) => {
   }
 });
 
-async function sincronizarTodosOsImoveis() {
-  try {
-    console.log('Iniciando sincronização de todos os imóveis...');
-    // 1. Obter todos os códigos de imóveis
-    const responseCodigos = await axios.get('${baseUrlApi}/imoveis_codigos');
-    const todosCodigos = responseCodigos.data;
-
-    console.log('Códigos dos imóveis:', todosCodigos);
-    // 2. Sincronizar cada imóvel
-    for (const codigo of todosCodigos) {
-      console.log(`Sincronizando imóvel ${codigo}...`);
-      const urlImovel = `${baseUrlApi}/imoveis/${codigo}`;
-      const responseImovel = await axios.get(urlImovel);
-
-      if (responseImovel.status === 200) {
-        console.log(`Sincronização imóvel ${codigo} CONCLUIDO`);
-      } else {
-        console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
-      }
-    }
-    console.log('Sincronização de todos os imóveis concluída!');
-  } catch (error) {
-    console.error('Erro ao sincronizar todos os imóveis:', error);
-  }
-}
-
-// Sincroniza sem o timer . Pega todos os ids e depois chama a rota imoveis/codigo que é o fluxo de sincronizar
-// app.get('/sincronizar-todos', async (req, res) => {
+// // Sincroniza todos de uma só vez
+// async function sincronizarTodosOsImoveis() {
 //   try {
-//     console.log('Iniciando sincronização de todos os imóveis...');
-
+//     escreverLog('Iniciando sincronização de todos os imóveis...');
 //     // 1. Obter todos os códigos de imóveis
 //     const responseCodigos = await axios.get('${baseUrlApi}/imoveis_codigos');
 //     const todosCodigos = responseCodigos.data;
-//     console.log('Códigos dos imóveis:', todosCodigos);
-
+//     escreverLog('Códigos dos imóveis:', todosCodigos);
 //     // 2. Sincronizar cada imóvel
 //     for (const codigo of todosCodigos) {
-//       console.log(`Sincronizando imóvel ${codigo}...`);
+//       escreverLog(`Sincronizando imóvel ${codigo}...`);
 //       const urlImovel = `${baseUrlApi}/imoveis/${codigo}`;
 //       const responseImovel = await axios.get(urlImovel);
 
 //       if (responseImovel.status === 200) {
-//         console.log(`Sincronização imóvel ${codigo} CONCLUIDO`);
+//         escreverLog(`Sincronização imóvel ${codigo} CONCLUIDO`);
 //       } else {
 //         console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
 //       }
 //     }
-//     console.log('Sincronização de todos os imóveis concluída!');
+//     escreverLog('Sincronização de todos os imóveis concluída!');
+//   } catch (error) {
+//     console.error('Erro ao sincronizar todos os imóveis:', error);
+//   }
+// }
+
+// Sincroniza sem o timer . Pega todos os ids e depois chama a rota imoveis/codigo que é o fluxo de sincronizar
+// app.get('/sincronizar-todos', async (req, res) => {
+//   try {
+//     escreverLog('Iniciando sincronização de todos os imóveis...');
+
+//     // 1. Obter todos os códigos de imóveis
+//     const responseCodigos = await axios.get('${baseUrlApi}/imoveis_codigos');
+//     const todosCodigos = responseCodigos.data;
+//     escreverLog('Códigos dos imóveis:', todosCodigos);
+
+//     // 2. Sincronizar cada imóvel
+//     for (const codigo of todosCodigos) {
+//       escreverLog(`Sincronizando imóvel ${codigo}...`);
+//       const urlImovel = `${baseUrlApi}/imoveis/${codigo}`;
+//       const responseImovel = await axios.get(urlImovel);
+
+//       if (responseImovel.status === 200) {
+//         escreverLog(`Sincronização imóvel ${codigo} CONCLUIDO`);
+//       } else {
+//         console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
+//       }
+//     }
+//     escreverLog('Sincronização de todos os imóveis concluída!');
 //     res.status(200).send('Sincronização concluída!');
 //   } catch (error) {
 //     console.error('Erro ao sincronizar todos os imóveis:', error);
@@ -481,25 +499,22 @@ app.get('/sincronizar-todos', async (req, res) => {
   try {
     let pagina = 1;
     let continuarSincronizando = true;
-
     while (continuarSincronizando) {
-      console.log(`Sincronizando lote da página ${pagina}...`);
-
+      escreverLog(`Sincronizando lote da página ${pagina}...`);
       const responseIds = await axios.get(`${baseUrlApi}/obter-ids-imoveis/${pagina}`);
       const codigos = responseIds.data;
-
       if (codigos.length === 0) {
-        continuarSincronizando = false; 
+        continuarSincronizando = false;
       } else {
-        await sincronizarLoteDeImoveis(codigos); 
-        pagina++; 
-
-        console.log(`Aguardando 2 minutos antes de sincronizar o próximo lote...`);
+        await sincronizarLoteDeImoveis(codigos);
+        pagina++;
+        escreverLog(`Aguardando 2 minutos antes de sincronizar o próximo lote...`);
         await new Promise(resolve => setTimeout(resolve, 120000)); // Pausa de 2 minutos (120000 milissegundos)
+        // await new Promise(resolve => setTimeout(resolve, 240000)); // Pausa de 4 minutos (240000 milissegundos)
       }
     }
 
-    console.log('Sincronização de todos os imóveis concluída!');
+    escreverLog('Sincronização de todos os imóveis concluída!');
     res.status(200).send('Sincronização concluída!');
   } catch (error) {
     console.error('Erro ao sincronizar todos os imóveis:', error);
@@ -510,7 +525,7 @@ app.get('/sincronizar-todos', async (req, res) => {
 app.get('/obter-ids-imoveis/:pagina', async (req, res) => {
   try {
     const pagina = parseInt(req.params.pagina) || 1;
-    const codigos = await obterImoveisPorPagina(pagina); 
+    const codigos = await obterImoveisPorPagina(pagina);
     res.json(codigos);
   } catch (error) {
     console.error('Erro ao buscar IDs dos imóveis:', error);
@@ -520,13 +535,13 @@ app.get('/obter-ids-imoveis/:pagina', async (req, res) => {
 
 async function sincronizarLoteDeImoveis(codigos) {
   for (const codigo of codigos) {
+    escreverLog(`Sincronizando imóvel ${codigo}...`);
     console.log(`Sincronizando imóvel ${codigo}...`);
     const urlImovel = `${baseUrlApi}/imoveis/${codigo}`;
     const responseImovel = await axios.get(urlImovel);
-
     if (responseImovel.status === 200) {
-      await sincronizarImovel(responseImovel.data);
       console.log(`Sincronização imóvel ${codigo} CONCLUIDO`);
+      escreverLog(`Sincronização imóvel ${codigo} CONCLUIDO`);
     } else {
       console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
     }
@@ -537,7 +552,7 @@ async function obterImoveisPorPagina(pagina) {
   const pesquisa = {
     "fields": ["Codigo"],
     "order": { "DataAtualizacao": "desc" },
-    "paginacao": { "pagina": pagina, "quantidade": 50 } // 50 por página
+    "paginacao": { "pagina": pagina, "quantidade": 50 }
   };
   const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
   const response = await axios.get(url);
@@ -553,9 +568,10 @@ async function obterImoveisPorPagina(pagina) {
 
 // Agendamento da Tarefa
 // const job = schedule.scheduleJob('0 0 * * *', async () => {
-//   console.log('Iniciando sincronização agendada...');
+//   escreverLog('Iniciando sincronização agendada...');
+//   // Sincroniza todos de uma só vez
 //   await sincronizarTodosOsImoveis();
-//   console.log('Sincronização agendada concluída!');
+//   escreverLog('Sincronização agendada concluída!');
 // });
 
 yargs(hideBin(process.argv))
@@ -567,23 +583,44 @@ yargs(hideBin(process.argv))
     }
   )
   .command('sincronizar', 'Sincroniza todos os imóveis manualmente', () => { }, async (argv) => {
-    console.log('Iniciando sincronização manual pelo terminal...');
-    await sincronizarTodosOsImoveis();
-    console.log('Sincronização manual concluída!');
+    escreverLog('Iniciando sincronização manual pelo terminal...');
+    // await sincronizarTodosOsImoveis();
+
+    // Sincroniza de 50 em 50 + timer    let pagina = 1;
+    let continuarSincronizando = true;
+    while (continuarSincronizando) {
+      escreverLog(`Sincronizando lote da página ${pagina}...`);
+      const responseIds = await axios.get(`${baseUrlApi}/obter-ids-imoveis/${pagina}`);
+      const codigos = responseIds.data;
+      if (codigos.length === 0) {
+        continuarSincronizando = false;
+      } else {
+        await sincronizarLoteDeImoveis(codigos);
+        pagina++;
+        escreverLog(`Aguardando 2 minutos antes de sincronizar o próximo lote...`);
+        await new Promise(resolve => setTimeout(resolve, 120000)); // Pausa de 2 minutos (120000 milissegundos)
+        // await new Promise(resolve => setTimeout(resolve, 240000)); // Pausa de 4 minutos (240000 milissegundos)
+      }
+    }
+
+
+    escreverLog('Sincronização manual concluída!');
     process.exit(0);
   })
   .demandCommand(1)
   .help()
   .argv;
 
-  // Configurar o diretório "imagens" para servir arquivos estáticos
-  app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
+// Configurar o diretório "imagens" para servir arquivos estáticos
+app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
 
-  app.listen(21009, '0.0.0.0', () => {
-    console.log(`Servidor rodando em https://api.duo.imb.br:${21009}`); 
-  });
+app.listen(21009, '0.0.0.0', () => {
+  escreverLog(`Servidor rodando em https://api.duo.imb.br:${21009}`);
+  console.log(`Servidor rodando em https://api.duo.imb.br:${21009}`);
+});
 
-  // local 
-  // app.listen(8080,() => {
-  //   console.log(`Servidor rodando em http://localhost:${8080}`);
-  // });
+//local 
+// app.listen(8080,() => {
+//   escreverLog(`Servidor rodando em http://localhost:${8080}`);
+//   console.log(`Servidor rodando em http://localhost:${8080}`);
+// });
