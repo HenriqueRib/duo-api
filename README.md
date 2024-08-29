@@ -14,6 +14,27 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
     - `/imo_imovel/:id`: Retorna detalhes de um imóvel pelo ID no banco de dados.
     - `/imo_arquivo/:nome`: Retorna detalhes de um arquivo de imagem pelo nome.
 
+## Acesso às Imagens
+
+As imagens dos imóveis são baixadas e salvas localmente. Você pode acessá-las utilizando a seguinte estrutura de URL:
+
+```
+http://api.duo.imb.br:21009/imagens/{ID_IMOVEL}/{Nome_do_Edificio-separado-por-hifens}-{ID_IMOVEL}-{ORDEM}.jpg
+```
+
+**Exemplo:**
+
+```
+http://api.duo.imb.br:21009/imagens/1599/balneario-moschen-1599-1.jpg
+```
+
+**Onde:**
+
+- `{ID_IMOVEL}`: ID do imóvel no banco de dados.
+- `{Nome_do_Edificio-separado-por-hifens}`: Nome do edifício com espaços substituídos por hifens.
+- `{ORDEM}`: Número sequencial da imagem dentro do imóvel.
+
+
 ## Pré-requisitos
 
 - **Node.js (v20.15.0 recomendado):** Faça o download em [https://nodejs.org/](https://nodejs.org/).

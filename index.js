@@ -10,6 +10,8 @@ const app = express();
 const fs = require('fs');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
+// const baseUrlApi = 'http://localhost:8080';
+const baseUrlApi = 'http://api.duo.imb.br:21009'; 
 
 // Configurações do banco de dados do .env
 const dbConfig = {
@@ -32,7 +34,7 @@ pool.getConnection((err, connection) => {
 
 async function consultarImovel(codigoImovel) {
   try {
-    const url = `https://api.duo.imb.br/8080/imo_imovel/${codigoImovel}`;
+    const url = `${baseUrlApi}/imo_imovel/${codigoImovel}`;
     const response = await axios.get(url);
     if (response.status === 200) {
       return response.data;
@@ -48,7 +50,7 @@ async function consultarImovel(codigoImovel) {
 
 async function consultarArquivo(nomeArquivo) {
   try {
-    const url = `https://api.duo.imb.br/8080/imo_arquivo/${nomeArquivo}`;
+    const url = `${baseUrlApi}/imo_arquivo/${nomeArquivo}`;
     const response = await axios.get(url);
     if (response.status === 200) {
       return response.data;
@@ -161,7 +163,7 @@ async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
       const nomeArquivo = new URL(fotoData.Foto).pathname.split('/').pop();
       console.log('Nome do arquivo:', nomeArquivo);
       const extensaoArquivo = path.extname(fotoData.Foto);
-      const novoNomeArquivo = `${imovel.titulo.replace(/ /g, '-').toLowerCase()}-${codigoImovel}-${key}${extensaoArquivo}`;
+      const novoNomeArquivo = `${sanitizarNomeArquivo(imovel.titulo)}-${codigoImovel}-${key}${extensaoArquivo}`; 
       console.log('Novo nome do arquivo:', novoNomeArquivo);
 
       const arquivo = {
@@ -216,6 +218,13 @@ async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
     console.error(`Erro ao sincronizar fotos do imóvel ${codigoImovel}:`, error);
     throw error;
   }
+}
+
+function sanitizarNomeArquivo(nome) {
+  return nome
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .replace(/[^a-z0-9\-]/gi, '-') // Substitui caracteres inválidos por hífen
+    .toLowerCase();
 }
 
 // Rotas da API
@@ -395,34 +404,6 @@ app.get('/imoveis_codigos', async (req, res) => {
   }
 });
 
-app.get('/sincronizar-todos', async (req, res) => {
-  try {
-    console.log('Iniciando sincronização de todos os imóveis...');
-
-    // 1. Obter todos os códigos de imóveis
-    const responseCodigos = await axios.get('https://api.duo.imb.br/8080/imoveis_codigos');
-    const todosCodigos = responseCodigos.data;
-    console.log('Códigos dos imóveis:', todosCodigos);
-
-    // 2. Sincronizar cada imóvel
-    for (const codigo of todosCodigos) {
-      console.log(`Sincronizando imóvel ${codigo}...`);
-      const urlImovel = `https://api.duo.imb.br/8080/imoveis/${codigo}`;
-      const responseImovel = await axios.get(urlImovel);
-
-      if (responseImovel.status === 200) {
-        console.log(`Sincronização imóvel ${codigo} CONCLUIDO`);
-      } else {
-        console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
-      }
-    }
-    console.log('Sincronização de todos os imóveis concluída!');
-    res.status(200).send('Sincronização concluída!');
-  } catch (error) {
-    console.error('Erro ao sincronizar todos os imóveis:', error);
-    res.status(500).send('Erro interno no servidor');
-  }
-});
 
 app.get('/campos', async (req, res) => {
   try {
@@ -443,14 +424,14 @@ async function sincronizarTodosOsImoveis() {
   try {
     console.log('Iniciando sincronização de todos os imóveis...');
     // 1. Obter todos os códigos de imóveis
-    const responseCodigos = await axios.get('https://api.duo.imb.br/8080/imoveis_codigos');
+    const responseCodigos = await axios.get('${baseUrlApi}/imoveis_codigos');
     const todosCodigos = responseCodigos.data;
 
     console.log('Códigos dos imóveis:', todosCodigos);
     // 2. Sincronizar cada imóvel
     for (const codigo of todosCodigos) {
       console.log(`Sincronizando imóvel ${codigo}...`);
-      const urlImovel = `https://api.duo.imb.br/8080/imoveis/${codigo}`;
+      const urlImovel = `${baseUrlApi}/imoveis/${codigo}`;
       const responseImovel = await axios.get(urlImovel);
 
       if (responseImovel.status === 200) {
@@ -462,6 +443,110 @@ async function sincronizarTodosOsImoveis() {
     console.log('Sincronização de todos os imóveis concluída!');
   } catch (error) {
     console.error('Erro ao sincronizar todos os imóveis:', error);
+  }
+}
+
+// Sincroniza sem o timer . Pega todos os ids e depois chama a rota imoveis/codigo que é o fluxo de sincronizar
+// app.get('/sincronizar-todos', async (req, res) => {
+//   try {
+//     console.log('Iniciando sincronização de todos os imóveis...');
+
+//     // 1. Obter todos os códigos de imóveis
+//     const responseCodigos = await axios.get('${baseUrlApi}/imoveis_codigos');
+//     const todosCodigos = responseCodigos.data;
+//     console.log('Códigos dos imóveis:', todosCodigos);
+
+//     // 2. Sincronizar cada imóvel
+//     for (const codigo of todosCodigos) {
+//       console.log(`Sincronizando imóvel ${codigo}...`);
+//       const urlImovel = `${baseUrlApi}/imoveis/${codigo}`;
+//       const responseImovel = await axios.get(urlImovel);
+
+//       if (responseImovel.status === 200) {
+//         console.log(`Sincronização imóvel ${codigo} CONCLUIDO`);
+//       } else {
+//         console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
+//       }
+//     }
+//     console.log('Sincronização de todos os imóveis concluída!');
+//     res.status(200).send('Sincronização concluída!');
+//   } catch (error) {
+//     console.error('Erro ao sincronizar todos os imóveis:', error);
+//     res.status(500).send('Erro interno no servidor');
+//   }
+// });
+
+app.get('/sincronizar-todos', async (req, res) => {
+  try {
+    let pagina = 1;
+    let continuarSincronizando = true;
+
+    while (continuarSincronizando) {
+      console.log(`Sincronizando lote da página ${pagina}...`);
+
+      const responseIds = await axios.get(`${baseUrlApi}/obter-ids-imoveis/${pagina}`);
+      const codigos = responseIds.data;
+
+      if (codigos.length === 0) {
+        continuarSincronizando = false; 
+      } else {
+        await sincronizarLoteDeImoveis(codigos); 
+        pagina++; 
+
+        console.log(`Aguardando 2 minutos antes de sincronizar o próximo lote...`);
+        await new Promise(resolve => setTimeout(resolve, 120000)); // Pausa de 2 minutos (120000 milissegundos)
+      }
+    }
+
+    console.log('Sincronização de todos os imóveis concluída!');
+    res.status(200).send('Sincronização concluída!');
+  } catch (error) {
+    console.error('Erro ao sincronizar todos os imóveis:', error);
+    res.status(500).send('Erro interno no servidor');
+  }
+});
+
+app.get('/obter-ids-imoveis/:pagina', async (req, res) => {
+  try {
+    const pagina = parseInt(req.params.pagina) || 1;
+    const codigos = await obterImoveisPorPagina(pagina); 
+    res.json(codigos);
+  } catch (error) {
+    console.error('Erro ao buscar IDs dos imóveis:', error);
+    res.status(500).send('Erro interno no servidor');
+  }
+});
+
+async function sincronizarLoteDeImoveis(codigos) {
+  for (const codigo of codigos) {
+    console.log(`Sincronizando imóvel ${codigo}...`);
+    const urlImovel = `${baseUrlApi}/imoveis/${codigo}`;
+    const responseImovel = await axios.get(urlImovel);
+
+    if (responseImovel.status === 200) {
+      await sincronizarImovel(responseImovel.data);
+      console.log(`Sincronização imóvel ${codigo} CONCLUIDO`);
+    } else {
+      console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
+    }
+  }
+}
+
+async function obterImoveisPorPagina(pagina) {
+  const pesquisa = {
+    "fields": ["Codigo"],
+    "order": { "DataAtualizacao": "desc" },
+    "paginacao": { "pagina": pagina, "quantidade": 50 } // 50 por página
+  };
+  const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
+  const response = await axios.get(url);
+
+  if (response.status === 200) {
+    return Object.values(response.data)
+      .filter(imovel => typeof imovel === 'object' && imovel.Codigo)
+      .map(imovel => imovel.Codigo);
+  } else {
+    throw new Error(`Erro ao buscar imóveis da API externa: ${response.status} - ${response.statusText}`);
   }
 }
 
@@ -494,6 +579,10 @@ yargs(hideBin(process.argv))
   app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
 
   app.listen(21009, '0.0.0.0', () => {
-    console.log(`Servidor rodando em http://0.0.0.0:${21009}`);
     console.log(`Servidor rodando em https://api.duo.imb.br:${21009}`); 
   });
+
+  // local 
+  // app.listen(8080,() => {
+  //   console.log(`Servidor rodando em http://localhost:${8080}`);
+  // });
