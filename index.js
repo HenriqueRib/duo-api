@@ -490,6 +490,9 @@ yargs(hideBin(process.argv))
   .help()
   .argv;
 
+  // Configurar o diretório "imagens" para servir arquivos estáticos
+  app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
+
   app.listen(21009, '0.0.0.0', () => {
     console.log(`Servidor rodando em http://0.0.0.0:${21009}`);
     console.log(`Servidor rodando em https://api.duo.imb.br:${21009}`); 
