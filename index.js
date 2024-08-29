@@ -68,9 +68,10 @@ async function consultarArquivo(nomeArquivo) {
 async function sincronizarImovel(imovelData) {
   try {
     const codigoImovel = imovelData.Codigo;
+    const titulo = imovelData.Edificio || (imovelData.Descricao ? imovelData.Descricao.substring(0, 50) : '');
     const imovel = {
       id_imovel: codigoImovel,
-      titulo: imovelData.Edificio || imovelData.Descricao.substring(0, 50),
+      titulo: titulo,
       descricao: imovelData.Descricao,
       situacao: imovelData.Status,
       categoria: imovelData.Categoria,
@@ -95,8 +96,7 @@ async function sincronizarImovel(imovelData) {
       gmaps_lng: imovelData.Longitude,
       lastmod: new Date().toISOString().slice(0, 10),
       sincronizado: 1,
-      // ativo: 1,
-      //TODO:Indentificar COMO saber que deve mostrar ou não no site. Em contato via e-mail
+      ativo: imovelData.ExibirNoSite === 'Sim' ? 1 : 0, 
     };
 
     const imovelExistente = await consultarImovel(codigoImovel);
@@ -153,6 +153,10 @@ async function sincronizarImovelValor(imovelData, codigoImovel) {
 
 async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
   try {
+    if (!codigoImovel) {
+      escreverLog(`Interrompe a função se codigoImovel for undefined ${codigoImovel}...`);
+      return; // Interrompe a função se codigoImovel for undefined
+    }
     escreverLog(`Iniciando sincronização de fotos para o imóvel ${codigoImovel}...`);
     // Crie a pasta se ela não existir
     const pastaImagens = path.join(__dirname, 'imagens', codigoImovel);
@@ -356,6 +360,7 @@ app.get('/imoveis/:codigo', async (req, res) => {
     const codigoImovel = req.params.codigo;
     const pesquisa = {
       "fields": [
+        "ExibirNoSite",
         "Codigo", "Edificio", "Categoria", "Descricao", "Status",
         "Dormitorios", "Vagas", "BanheiroSocialQtd", "AreaPrivativa",
         "Cidade", "UF", "Bairro", "Endereco", "TipoEndereco",
