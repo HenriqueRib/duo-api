@@ -92,32 +92,31 @@ async function sincronizarImovel(imovelData) {
       gmaps_lat: imovelData.Latitude,
       gmaps_lng: imovelData.Longitude,
       lastmod: new Date().toISOString().slice(0, 10),
-      //ativo: 1,
-      //TODO:Indentificar COMO saber que deve mostrar ou não no site.
+      // ativo: 1,
+      //TODO:Indentificar COMO saber que deve mostrar ou não no site. Em contato via e-mail
     };
 
     const imovelExistente = await consultarImovel(codigoImovel);
-    //TODO: VOLTAR
-    // if (imovelExistente != null) {
-    //   await pool.query('UPDATE imo_imovel SET ? WHERE id_imovel = ?', [imovel, codigoImovel]);
-    //   await pool.query('COMMIT');
-    //   console.log(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel.`);
-    //   // console.log('Dados inseridos na tabela imo_imovel:', imovel);
-    // } else {
-    //   // Gerar comando INSERT para imo_imovel - Ajuda a identificar campos que faltam
-    //   // const camposImovel = Object.keys(imovel).join(', ');
-    //   // const valoresImovel = Object.values(imovel)
-    //   //   .map(valor => mysql.escape(valor))
-    //   //   .join(', ');
-    //   // // const sqlInsertImovel = `INSERT INTO imo_imovel (${camposImovel}) VALUES (${valoresImovel});`;
-    //   // console.log('Comando INSERT para imo_imovel:', sqlInsertImovel); // Imprime o comando SQL
-    //   await pool.query('INSERT INTO imo_imovel SET ?', [imovel]);
-    //   await pool.query('COMMIT');
-    //   console.log(`INSERT Imóvel ${codigoImovel} inserido na tabela imo_imovel.`);
-    //   // console.log('Dados inseridos na tabela imo_imovel:', imovel);
-    // }
-    // await sincronizarImovelValor(imovelData, codigoImovel);
-    // await sincronizarImovelFotos(imovelData, codigoImovel, imovel);
+    if (imovelExistente != null) {
+      await pool.query('UPDATE imo_imovel SET ? WHERE id_imovel = ?', [imovel, codigoImovel]);
+      await pool.query('COMMIT');
+      console.log(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel.`);
+      // console.log('Dados inseridos na tabela imo_imovel:', imovel);
+    } else {
+      // Gerar comando INSERT para imo_imovel - Ajuda a identificar campos que faltam
+      // const camposImovel = Object.keys(imovel).join(', ');
+      // const valoresImovel = Object.values(imovel)
+      //   .map(valor => mysql.escape(valor))
+      //   .join(', ');
+      // // const sqlInsertImovel = `INSERT INTO imo_imovel (${camposImovel}) VALUES (${valoresImovel});`;
+      // console.log('Comando INSERT para imo_imovel:', sqlInsertImovel); // Imprime o comando SQL
+      await pool.query('INSERT INTO imo_imovel SET ?', [imovel]);
+      await pool.query('COMMIT');
+      console.log(`INSERT Imóvel ${codigoImovel} inserido na tabela imo_imovel.`);
+      // console.log('Dados inseridos na tabela imo_imovel:', imovel);
+    }
+    await sincronizarImovelValor(imovelData, codigoImovel);
+    await sincronizarImovelFotos(imovelData, codigoImovel, imovel);
   } catch (error) {
     console.error(`Erro ao sincronizar imóvel ${imovelData.Codigo}:`, error);
     throw error;
@@ -340,8 +339,7 @@ app.get('/imoveis/:codigo', async (req, res) => {
     const response = await axios.get(url);
 
     if (response.status === 200) {
-      //TODO: VOLTAR
-      // await sincronizarImovel(response.data);
+      await sincronizarImovel(response.data);
       res.json({ ...response.data });
     } else {
       const errorMessage = `Erro ao buscar detalhes do imóvel: ${response.status} - ${response.statusText}`;
