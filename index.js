@@ -620,8 +620,9 @@ yargs(hideBin(process.argv))
 app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
 
 app.listen(21009, '0.0.0.0', () => {
-  escreverLog(`Servidor rodando em https://api.duo.imb.br:${21009}`);
-  console.log(`Servidor rodando em https://api.duo.imb.br:${21009}`);
+  const dataHoraAtual = new Date().toLocaleString();
+  escreverLog(`Servidor rodando em https://api.duo.imb.br:${21009} - ${dataHoraAtual}`);
+  console.log(`Servidor rodando em https://api.duo.imb.br:${21009} - ${dataHoraAtual}`); 
 });
 
 //local 
