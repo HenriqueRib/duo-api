@@ -4,14 +4,17 @@ const axios = require('axios');
 const mysql = require('mysql');
 const path = require('path');
 const apiKey = process.env.API_KEY;
-const baseUrl = 'https://clie1076-rest.vistahost.com.br/imoveis';
+const baseUrl = process.env.BASE_URL;
 const express = require('express');
 const app = express();
 const fs = require('fs');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-// const baseUrlApi = 'http://localhost:8080';
-const baseUrlApi = 'http://api.duo.imb.br:21009'; 
+const baseUrlApi = process.env.APP_ENV === 'production'
+  ? process.env.BASE_URL_API_PRODUCTION
+  : process.env.BASE_URL_API_LOCAL;
+const PORTA = process.env.APP_ENV === 'production' ? process.env.PORTA_PRODUCTION  : process.env.PORTA_LOCAL ;
+const HOST = process.env.APP_ENV === 'production' ? process.env.HOST_PRODUCTION : process.env.HOST_LOCAL ;
 
 // Configurações do banco de dados do .env
 const dbConfig = {
@@ -39,11 +42,11 @@ async function consultarImovel(codigoImovel) {
     if (response.status === 200) {
       return response.data;
     } else {
-      // console.error(`Erro ao consultar imóvel ${codigoImovel}:`, response.status, response.statusText);
+      console.error(`Erro ao consultar imóvel ${codigoImovel}:`, response.status, response.statusText);
       return null;
     }
   } catch (error) {
-    // console.error(`Erro ao consultar imóvel ${codigoImovel}:`, error);
+    console.error(`Erro ao consultar imóvel ${codigoImovel}:`, error);
     return null;
   }
 }
@@ -55,16 +58,40 @@ async function consultarArquivo(nomeArquivo) {
     if (response.status === 200) {
       return response.data;
     } else {
-      // console.error(`Erro ao consultar arquivo ${nomeArquivo}:`, response.status, response.statusText);
+      console.error(`Em consultarArquivo não encontrado ${nomeArquivo}:`, response.status, response.statusText);
       return null;
     }
   } catch (error) {
-    // console.error(`Erro ao consultar arquivo ${nomeArquivo}:`, error);
+    console.error(`Erro ao consultar arquivo ${nomeArquivo}:`, error);
     return null;
   }
 }
 
 // Funções para sincronizar tabelas
+async function ativarImovel(codigoImovel) {
+  try {
+    await pool.query('UPDATE imo_imovel SET ativo = 1 WHERE id_imovel = ?', [codigoImovel]);
+    await pool.query('COMMIT');
+    escreverLog(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel. Foi ativado no site`);
+    return true;
+  } catch (error) {
+    console.error(`Erro ao ativarImovel ${codigoImovel}:`, error);
+    throw error;
+  }
+}
+
+async function desativarImovel(codigoImovel) {
+  try {
+    await pool.query('UPDATE imo_imovel SET ativo = 0 WHERE id_imovel = ?', [codigoImovel]);
+    await pool.query('COMMIT');
+    escreverLog(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel. Foi desativado no site`);
+    return true;
+  } catch (error) {
+    console.error(`Erro ao desativarImovel ${codigoImovel}:`, error);
+    throw error;
+  }
+}
+
 async function sincronizarImovel(imovelData) {
   try {
     const codigoImovel = imovelData.Codigo;
@@ -95,16 +122,11 @@ async function sincronizarImovel(imovelData) {
       gmaps_lat: imovelData.Latitude,
       gmaps_lng: imovelData.Longitude,
       lastmod: new Date().toISOString().slice(0, 10),
-      sincronizado: 1,
       ativo: imovelData.ExibirNoSite === 'Sim' ? 1 : 0, 
     };
 
     const imovelExistente = await consultarImovel(codigoImovel);
     if (imovelExistente != null) {
-      if (imovelExistente.sincronizado === 1) {
-        escreverLog(`Imóvel ${codigoImovel} já sincronizado. Pulando...`);
-        return;  // Não sincroniza se já sincronizado
-      }
       await pool.query('UPDATE imo_imovel SET ? WHERE id_imovel = ?', [imovel, codigoImovel]);
       await pool.query('COMMIT');
       escreverLog(`UPDATE Imóvel ${codigoImovel} atualizado na tabela imo_imovel.`);
@@ -115,8 +137,9 @@ async function sincronizarImovel(imovelData) {
       // const valoresImovel = Object.values(imovel)
       //   .map(valor => mysql.escape(valor))
       //   .join(', ');
-      // // const sqlInsertImovel = `INSERT INTO imo_imovel (${camposImovel}) VALUES (${valoresImovel});`;
+      // const sqlInsertImovel = `INSERT INTO imo_imovel (${camposImovel}) VALUES (${valoresImovel});`;
       // escreverLog('Comando INSERT para imo_imovel:', sqlInsertImovel); // Imprime o comando SQL
+      // console.log('Comando INSERT para imo_imovel:', sqlInsertImovel); //
       await pool.query('INSERT INTO imo_imovel SET ?', [imovel]);
       await pool.query('COMMIT');
       escreverLog(`INSERT Imóvel ${codigoImovel} inserido na tabela imo_imovel.`);
@@ -132,7 +155,6 @@ async function sincronizarImovel(imovelData) {
 
 async function sincronizarImovelValor(imovelData, codigoImovel) {
   try {
-
     const dataAtual = new Date();
     const valor = {
       id_imovel: codigoImovel,
@@ -165,22 +187,23 @@ async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
     }
     for (const key in imovelData.Foto) {
       const fotoData = imovelData.Foto[key];
-      escreverLog(`Processando foto ${key}:`, fotoData);
+      escreverLog(`Processando foto ${key}: ${JSON.stringify(fotoData)}`); 
       const nomeArquivo = new URL(fotoData.Foto).pathname.split('/').pop();
-      escreverLog('Nome do arquivo:', nomeArquivo);
+      escreverLog(`Nome do arquivo: ${nomeArquivo}` );
       const extensaoArquivo = path.extname(fotoData.Foto);
       const novoNomeArquivo = `${sanitizarNomeArquivo(imovel.titulo)}-${codigoImovel}-${key}${extensaoArquivo}`;
-      escreverLog('Novo nome do arquivo:', novoNomeArquivo);
+      escreverLog(`Novo nome do arquivo: ${novoNomeArquivo}`);
       const arquivo = {
         id_imovel: codigoImovel,
-        arquivo: novoNomeArquivo,
+        arquivo: `${codigoImovel}/` + novoNomeArquivo,
+        name_arquivo_crm: nomeArquivo,
         legenda: null,
         id_categoria: 1,
         principal: fotoData.Destaque === 'Sim' ? 'S' : 'N',
         id_importado: codigoImovel,
         ordem: key
       };
-      const arquivoExistente = await consultarArquivo(novoNomeArquivo);
+      const arquivoExistente = await consultarArquivo(nomeArquivo);
       // Faça o download da imagem
       const caminhoArquivo = path.join(pastaImagens, novoNomeArquivo);
       const response = await axios.get(fotoData.Foto, { responseType: 'stream' });
@@ -188,7 +211,7 @@ async function sincronizarImovelFotos(imovelData, codigoImovel, imovel) {
       escreverLog(`Imagem ${novoNomeArquivo} do imóvel ${codigoImovel} baixada para ${caminhoArquivo}.`);
 
       if (arquivoExistente != null) {
-        // 1. Verificar se há dados para atualizar (exemplo simplificado)
+        // 1. Verificar se há dados para atualizar
         let precisaAtualizar = false;
         for (const campo in arquivo) {
           if (campo !== 'id_arquivo' && String(arquivo[campo]) !== String(arquivoExistente[campo])) {
@@ -234,17 +257,15 @@ function formatarDataParaLog() {
   const dia = data.getDate().toString().padStart(2, '0');
   const mes = (data.getMonth() + 1).toString().padStart(2, '0');
   const ano = data.getFullYear();
-  return `${dia}${mes}${ano}`;
+  return `${dia}-${mes}-${ano}`;
 }
 
 function escreverLog(mensagem) {
   const nomeArquivo = path.join(__dirname, 'logs', `log-${formatarDataParaLog()}.log`);
-
   // Cria o diretório 'logs' se ele não existir
   if (!fs.existsSync(path.join(__dirname, 'logs'))) {
     fs.mkdirSync(path.join(__dirname, 'logs'));
   }
-
   // Anexa a mensagem ao arquivo de log
   fs.appendFile(nomeArquivo, `${mensagem}\n`, (err) => {
     if (err) {
@@ -254,6 +275,43 @@ function escreverLog(mensagem) {
 }
 
 // Rotas da API
+app.get('/ativar-imovel/:id', async (req, res) => {
+  try {
+    const codigoImovel = req.params.id; 
+    if (!codigoImovel) {
+      return res.status(400).send('ID do imóvel não fornecido.');
+    }
+    const urlImovel = `${baseUrlApi}/imoveis/${codigoImovel}`;
+    const responseImovel = await axios.get(urlImovel);
+    if (responseImovel.status === 200) {
+      console.log(`Sincronização imóvel ${codigoImovel} CONCLUIDO`);
+    } else {
+      console.error(`Erro ao buscar detalhes do imóvel ${codigo}:`, responseImovel.status, responseImovel.statusText);
+    }
+    await ativarImovel(codigoImovel);
+    escreverLog(`Imóvel foi ativado com sucesso! ${codigoImovel}`);
+    res.status(200).send('Imóvel foi ativado com sucesso!'); 
+  } catch (error) {
+    console.error(`Erro ao ativar imóvel ${codigoImovel}:`, error);
+    res.status(500).send('Erro ao ativar imóvel.'); 
+  }
+});
+
+app.get('/desativar-imovel/:id', async (req, res) => {
+  try {
+    const codigoImovel = req.params.id; 
+    if (!codigoImovel) {
+      return res.status(400).send('ID do imóvel não fornecido.');
+    }
+    await desativarImovel(codigoImovel);
+    escreverLog(`Imóvel foi desativado com sucesso! ${codigoImovel}`);
+    res.status(200).send('Imóvel foi desativado com sucesso!'); 
+  } catch (error) {
+    console.error(`Erro ao ativar imóvel ${codigoImovel}:`, error);
+    res.status(500).send('Erro ao ativar imóvel.'); 
+  }
+});
+
 app.get('/identificar-colunas', async (req, res) => {
   try {
     const tabelas = ['imo_arquivo', 'imo_bairro', 'imo_categoria', 'imo_cidade', 'imo_imovel', 'imo_internacional', 'imo_valor'];
@@ -281,11 +339,12 @@ app.get('/imo_arquivo/:nome', async (req, res) => {
   try {
     const nomeArquivo = req.params.nome;
     pool.query(
-      'SELECT * FROM imo_arquivo WHERE arquivo = ?',
+      'SELECT * FROM imo_arquivo WHERE name_arquivo_crm = ?',
       [nomeArquivo],
       (error, results) => {
         if (error) {
           console.error('Erro ao consultar imo_arquivo:', error);
+          escreverLog('Erro ao consultar imo_arquivo:', error);
           res.status(500).send('Erro interno no servidor');
           return;
         }
@@ -340,7 +399,7 @@ app.get('/imoveis', async (req, res) => {
         "Caracteristicas", "ValorIptu", "ValorCondominio", "DistanciaMar", "ExibirNoSite",
       ],
       "order": { "DataAtualizacao": "desc" },
-      "paginacao": { "pagina": page, "quantidade": 50 }
+      "paginacao": { "pagina": page, "quantidade": process.env.QTD_POR_PAGINA }
     };
     const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
     const response = await axios.get(url);
@@ -372,6 +431,7 @@ app.get('/imoveis/:codigo', async (req, res) => {
     };
 
     const url = `${baseUrl}/detalhes?key=${apiKey}&imovel=${codigoImovel}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}`;
+    // const url = `${baseUrl}/detalhes?key=${apiKey}&imovel=${codigoImovel}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showSuspended=1`;
     const response = await axios.get(url);
 
     if (response.status === 200) {
@@ -398,7 +458,7 @@ app.get('/imoveis_codigos', async (req, res) => {
       const pesquisa = {
         "fields": ["Codigo"],
         "order": { "DataAtualizacao": "desc" },
-        "paginacao": { "pagina": pagina, "quantidade": 50 }
+        "paginacao": { "pagina": pagina, "quantidade": process.env.QTD_POR_PAGINA }
       };
       const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
       const response = await axios.get(url);
@@ -408,9 +468,8 @@ app.get('/imoveis_codigos', async (req, res) => {
           .map(imovel => imovel.Codigo);
 
         todosCodigos = todosCodigos.concat(codigos); // Adiciona os novos códigos ao array principal
-
         // Verifica se há mais páginas
-        if (codigos.length < 50) {
+        if (codigos.length < process.env.QTD_POR_PAGINA) {
           continuarBuscando = false; // Para a busca se a página atual tem menos de 50 códigos
         } else {
           pagina++; // Incrementa a página para a próxima requisição
@@ -502,6 +561,7 @@ app.get('/campos', async (req, res) => {
 // Sincronizar todos de 50 em 50 + o time de pausa 
 app.get('/sincronizar-todos', async (req, res) => {
   try {
+    //TODO: - Criar consulta no banco de dados - Criar uma tabela que Vai gravar o dia e a página atual + Tentativa - Status (Processando). 
     let pagina = 1;
     let continuarSincronizando = true;
     while (continuarSincronizando) {
@@ -515,10 +575,8 @@ app.get('/sincronizar-todos', async (req, res) => {
         pagina++;
         escreverLog(`Aguardando 2 minutos antes de sincronizar o próximo lote...`);
         await new Promise(resolve => setTimeout(resolve, 120000)); // Pausa de 2 minutos (120000 milissegundos)
-        // await new Promise(resolve => setTimeout(resolve, 240000)); // Pausa de 4 minutos (240000 milissegundos)
       }
     }
-
     escreverLog('Sincronização de todos os imóveis concluída!');
     res.status(200).send('Sincronização concluída!');
   } catch (error) {
@@ -557,7 +615,7 @@ async function obterImoveisPorPagina(pagina) {
   const pesquisa = {
     "fields": ["Codigo"],
     "order": { "DataAtualizacao": "desc" },
-    "paginacao": { "pagina": pagina, "quantidade": 50 }
+    "paginacao": { "pagina": pagina, "quantidade": process.env.QTD_POR_PAGINA }
   };
   const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
   const response = await axios.get(url);
@@ -604,11 +662,8 @@ yargs(hideBin(process.argv))
         pagina++;
         escreverLog(`Aguardando 2 minutos antes de sincronizar o próximo lote...`);
         await new Promise(resolve => setTimeout(resolve, 120000)); // Pausa de 2 minutos (120000 milissegundos)
-        // await new Promise(resolve => setTimeout(resolve, 240000)); // Pausa de 4 minutos (240000 milissegundos)
       }
     }
-
-
     escreverLog('Sincronização manual concluída!');
     process.exit(0);
   })
@@ -619,14 +674,11 @@ yargs(hideBin(process.argv))
 // Configurar o diretório "imagens" para servir arquivos estáticos
 app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
 
-app.listen(21009, '0.0.0.0', () => {
+app.listen(PORTA, HOST, async () => {
   const dataHoraAtual = new Date().toLocaleString();
-  escreverLog(`Servidor rodando em https://api.duo.imb.br:${21009} - ${dataHoraAtual}`);
-  console.log(`Servidor rodando em https://api.duo.imb.br:${21009} - ${dataHoraAtual}`); 
+  const mensagem = `Servidor rodando em http://${HOST}:${PORTA} - ${dataHoraAtual}`;
+  escreverLog(mensagem);
+  console.log(mensagem);
+  // Inicia a sincronização após o servidor subir
+  // await sincronizarTodosOsImoveis(); 
 });
-
-//local 
-// app.listen(8080,() => {
-//   escreverLog(`Servidor rodando em http://localhost:${8080}`);
-//   console.log(`Servidor rodando em http://localhost:${8080}`);
-// });

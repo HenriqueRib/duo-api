@@ -13,6 +13,10 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
     - `/identificar-colunas`: Lista as colunas das tabelas do banco de dados.
     - `/imo_imovel/:id`: Retorna detalhes de um imóvel pelo ID no banco de dados.
     - `/imo_arquivo/:nome`: Retorna detalhes de um arquivo de imagem pelo nome.
+    - `/ativar-imovel/:id`: Força aparecer o imovel no site
+    - `/desativar-imovel/:id`: Força retirar do site 
+    
+    
 
 ## Acesso às Imagens
 
@@ -54,6 +58,27 @@ http://api.duo.imb.br:21009/imagens/1599/balneario-moschen-1599-1.jpg
    ```
 3. **Configure o arquivo `.env`:**
    ```
+   # API Externa	
+   BASE_URL=[SUA_ROTA_API]
+   API_KEY=[SUA_API_KEY] 
+
+   # Ambiente da Aplicação
+   APP_ENV=local # ou APP_ENV=production
+
+   # Banco de Dados
+   DB_HOST=[HOST_DO_BANCO_DE_DADOS]
+   DB_USER=[USUARIO_DO_BANCO_DE_DADOS]
+   DB_PASSWORD=[SENHA_DO_BANCO_DE_DADOS]
+   DB_NAME=[NOME_DO_BANCO_DE_DADOS]
+
+   # Configuração do Servidor
+   PORTA_PRODUCTION=21009
+   PORTA_LOCAL=8080
+   HOST_PRODUCTION='0.0.0.0'
+   HOST_LOCAL='localhost'
+
+   # Paginação
+   QTD_POR_PAGINA=50 
    API_KEY=[SUA_API_KEY]
    DB_HOST=[HOST_DO_BANCO_DE_DADOS]
    DB_USER=[USUARIO_DO_BANCO_DE_DADOS]
@@ -83,7 +108,17 @@ http://api.duo.imb.br:21009/imagens/1599/balneario-moschen-1599-1.jpg
 
 ## Comandos SQL 
 
-- **Alteração banco de dados:**
+- **Alteração banco de dados na tabela imo_imovel:**
    ```bash
    ALTER TABLE imo_imovel ADD COLUMN sincronizado TINYINT(1) DEFAULT 0;
+   ```
+   ```bash
+   ALTER TABLE imo_imovel DROP COLUMN sincronizado; 
+   ```
+- **Alteração banco de dados na tabela imo_arquivo:**
+   ```bash
+   ALTER TABLE imo_arquivo ADD COLUMN name_arquivo_crm VARCHAR(255); 
+   ```
+   ```bash
+   TRUNCATE TABLE imo_arquivo;
    ```
