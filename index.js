@@ -410,6 +410,7 @@ app.get('/imoveis', async (req, res) => {
     }
   } catch (error) {
     console.error('Erro ao buscar imóveis:', error);
+    escreverLog(`Erro ao buscar imóveis: ${JSON.stringify(error)}`); 
     res.status(500).send('Erro interno no servidor');
   }
 });
@@ -444,6 +445,7 @@ app.get('/imoveis/:codigo', async (req, res) => {
     }
   } catch (error) {
     console.error('Erro ao buscar detalhes do imóvel:', error);
+    escreverLog(`Erro ao buscar detalhes do imóvel: ${JSON.stringify(error)}`); 
     res.status(500).send('Erro interno no servidor');
   }
 });
@@ -483,6 +485,7 @@ app.get('/imoveis_codigos', async (req, res) => {
     res.json(todosCodigos);
   } catch (error) {
     console.error('Erro ao buscar códigos dos imóveis:', error);
+    escreverLog(`Erro ao buscar códigos dos imóveis: ${JSON.stringify(error)}`); 
     res.status(500).send('Erro interno no servidor');
   }
 });
