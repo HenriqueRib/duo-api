@@ -15,7 +15,8 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
     - `/imo_arquivo/:nome`: Retorna detalhes de um arquivo de imagem pelo nome.
     - `/ativar-imovel/:id`: Força aparecer o imovel no site
     - `/desativar-imovel/:id`: Força retirar do site 
-    
+    - `/controle-sincronizar`: Mostra o status do fluxo de sincronização 
+    - `/atualiza-controle-sincronizar`: Atualiza status do fluxo de sincronização
     
 
 ## Acesso às Imagens
@@ -121,4 +122,14 @@ http://api.duo.imb.br:21009/imagens/1599/balneario-moschen-1599-1.jpg
    ```
    ```bash
    TRUNCATE TABLE imo_arquivo;
+   ```
+- **Alteração banco de dados criando tabela imo_controle_sincronizar:**
+   ```bash
+      CREATE TABLE imo_controle_sincronizar (
+         id INT AUTO_INCREMENT PRIMARY KEY,
+         dia DATE,
+         pagina_atual INT,
+         qtd_tentativa INT DEFAULT 0,
+         status VARCHAR(255)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
    ```

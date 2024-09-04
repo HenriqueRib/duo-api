@@ -2,6 +2,7 @@ require('dotenv').config();
 // const schedule = require('node-schedule');
 const axios = require('axios');
 const mysql = require('mysql');
+const util = require('util');
 const path = require('path');
 const apiKey = process.env.API_KEY;
 const baseUrl = process.env.BASE_URL;
@@ -24,7 +25,12 @@ const dbConfig = {
   database: process.env.DB_NAME,
 };
 
-const pool = mysql.createPool(dbConfig);
+// const pool = mysql.createPool(dbConfig);
+const pool = mysql.createPool({
+  ...dbConfig, 
+  multipleStatements: true
+});
+pool.query = util.promisify(pool.query);
 
 pool.getConnection((err, connection) => {
   if (err) {
@@ -505,7 +511,62 @@ app.get('/campos', async (req, res) => {
   }
 });
 
-// // Sincroniza todos de uma só vez
+// Fluxo sincronizar 
+app.get('/controle-sincronizar', async (req, res) => {
+  try {
+    const hoje = new Date().toISOString().slice(0, 10); 
+    const [rows] = await pool.query('SELECT * FROM imo_controle_sincronizar WHERE dia = ?', [hoje]);
+    if (rows == undefined) {
+      const responseAtualizaProcessando = await axios.get(`${baseUrlApi}/atualiza-controle-sincronizar?pagina_atual=1&dia=${hoje}&qtd_tentativa=0&status=Concluido`);
+      if (responseAtualizaProcessando.status === 200) {
+        escreverLog(`Sincronização esta em com status de Processando na pagina ${pagina} na tentativa ${tentativa} `);
+      }
+      res.status(404).send('Nenhum registro encontrado para o dia atual.');
+    }
+    if ( rows != undefined) {
+      if(rows.dia != undefined){
+        res.json(rows);
+      }
+    } 
+  } catch (error) {
+    console.error('Erro ao buscar dados de controle de sincronização:', error);
+    res.status(500).send('Erro ao buscar dados de controle de sincronização.');
+  }
+});
+
+app.get('/atualiza-controle-sincronizar', async (req, res) => {
+  try {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const pagina_atual = parseInt(req.query.pagina_atual); 
+    const qtd_tentativa = parseInt(req.query.qtd_tentativa); 
+    const status = req.query.status;
+    if (isNaN(pagina_atual) || isNaN(qtd_tentativa) || !status) {
+      return res.status(400).send('Parâmetros inválidos.');
+    }
+    const [rows] = await pool.query('SELECT * FROM imo_controle_sincronizar WHERE dia = ?', [hoje]);
+    if (rows == undefined) {
+      await pool.query(
+        'INSERT INTO imo_controle_sincronizar (dia, pagina_atual, qtd_tentativa, status) VALUES (?, ?, ?, ?)',
+        [hoje, pagina_atual, qtd_tentativa, status]
+      );
+      res.send('Novo registro inserido com sucesso!');
+    }
+    if ( rows != undefined) {
+      if(rows.dia != undefined){
+        await pool.query(
+          'UPDATE imo_controle_sincronizar SET pagina_atual = ?, qtd_tentativa = ?, status = ? WHERE dia = ?',
+          [pagina_atual, qtd_tentativa, status, hoje]
+        );
+        res.send('Registro atualizado com sucesso!');
+      }
+    } 
+  } catch (error) {
+    console.error('Erro ao inserir/atualizar dados de controle de sincronização:', error);
+    res.status(500).send('Erro ao inserir/atualizar dados de controle de sincronização.');
+  }
+});
+
+// Sincroniza todos de uma só vez
 // async function sincronizarTodosOsImoveis() {
 //   try {
 //     escreverLog('Iniciando sincronização de todos os imóveis...');
@@ -564,7 +625,6 @@ app.get('/campos', async (req, res) => {
 // Sincronizar todos de 50 em 50 + o time de pausa 
 app.get('/sincronizar-todos', async (req, res) => {
   try {
-    //TODO: - Criar consulta no banco de dados - Criar uma tabela que Vai gravar o dia e a página atual + Tentativa - Status (Processando). 
     let pagina = 1;
     let continuarSincronizando = true;
     while (continuarSincronizando) {
@@ -581,6 +641,17 @@ app.get('/sincronizar-todos', async (req, res) => {
       }
     }
     escreverLog('Sincronização de todos os imóveis concluída!');
+    res.status(200).send('Sincronização concluída!');
+  } catch (error) {
+    console.error('Erro ao sincronizar todos os imóveis:', error);
+    res.status(500).send('Erro interno no servidor');
+  }
+});
+
+app.get('/sincronizar', async (req, res) => {
+  try {
+    await sincronizarTodosOsImoveisFluxoCompleto();
+    escreverLog('Sincronização imóveis concluída!');
     res.status(200).send('Sincronização concluída!');
   } catch (error) {
     console.error('Erro ao sincronizar todos os imóveis:', error);
@@ -629,6 +700,81 @@ async function obterImoveisPorPagina(pagina) {
       .map(imovel => imovel.Codigo);
   } else {
     throw new Error(`Erro ao buscar imóveis da API externa: ${response.status} - ${response.statusText}`);
+  }
+}
+
+async function sincronizarTodosOsImoveisFluxoCompleto() {
+  try {
+    escreverLog('Iniciando sincronizarTodosOsImoveisFluxoCompleto ...');
+    const response = await axios.get(`${baseUrlApi}/controle-sincronizar`);
+    let pagina; 
+    if (response.status === 200) {
+      console.log(`sincronizarTodosOsImoveisFluxoCompleto ${JSON.stringify(response.data.status)}`);
+
+      if(response.data.status == "Processando"){
+        const pagina = response.data.pagina_atual;
+        const tentativa = response.data.qtd_tentativa + 1;
+        const responseAtualizaProcessando = await axios.get(`${baseUrlApi}/atualiza-controle-sincronizar?pagina_atual=${pagina}&qtd_tentativa=${tentativa}&status=Processando`);
+        if (responseAtualizaProcessando.status === 200) {
+          escreverLog(`Sincronização esta em com status de Processando na pagina ${pagina} na tentativa ${tentativa} `);
+        }
+      }
+
+      if(response.data.status == "Processando" && response.data.qtd_tentativa > 5 ){
+        pagina = response.data.pagina_atual;
+        const tentativa = response.data.qtd_tentativa + 1;
+        const responseAtualizaProcessando = await axios.get(`${baseUrlApi}/atualiza-controle-sincronizar?pagina_atual=${pagina}&qtd_tentativa=${tentativa}&status=Processando`);
+        if (responseAtualizaProcessando.status === 200) {
+          escreverLog(`Sincronização esta em com status de Processando na pagina ${pagina} na tentativa ${tentativa} `);
+        }
+
+        escreverLog(`Iniciando Sincronização da página ${response.data.pagina_atual}...`);
+        const responseIds = await axios.get(`${baseUrlApi}/obter-ids-imoveis/${pagina}`);
+        const codigos = responseIds.data;
+        await sincronizarLoteDeImoveis(codigos);
+
+        pagina = pagina + 1;
+        const responseAtualiza = await axios.get(`${baseUrlApi}/atualiza-controle-sincronizar?pagina_atual=${pagina}&qtd_tentativa=0&status=Concluido`);
+        if (responseAtualiza.status === 200) {
+          escreverLog(`Sincronização lote pagina ${pagina} CONCLUIDO`);
+        }
+      }
+
+      if(response.data.qtd_tentativa > 10){
+        pagina = response.data.pagina_atual + 1;
+        const tentativa = 0;
+        const responseAtualizaProcessando = await axios.get(`${baseUrlApi}/atualiza-controle-sincronizar?pagina_atual=${pagina}&qtd_tentativa=${tentativa}&status=Tentativa`);
+        if (responseAtualizaProcessando.status === 200) {
+          escreverLog(`Sincronização esta em com status de Tentativa na pagina ${pagina} na tentativa ${tentativa} `);
+        }
+      }
+
+      if(response.data.status == "Concluido" || response.data.status == "Tentativa"){
+        pagina = response.data.pagina_atual;
+        const tentativa = response.data.qtd_tentativa + 1;
+        const responseAtualizaProcessando = await axios.get(`${baseUrlApi}/atualiza-controle-sincronizar?pagina_atual=${pagina}&qtd_tentativa=${tentativa}&status=Processando`);
+        if (responseAtualizaProcessando.status === 200) {
+          escreverLog(`Sincronização status Processando ${pagina}`);
+        }
+
+        escreverLog(`Iniciando Sincronização da página ${response.data.pagina_atual}...`);
+        const responseIds = await axios.get(`${baseUrlApi}/obter-ids-imoveis/${pagina}`);
+        const codigos = responseIds.data;
+        await sincronizarLoteDeImoveis(codigos);
+
+        pagina = pagina + 1;
+        const responseAtualiza = await axios.get(`${baseUrlApi}/atualiza-controle-sincronizar?pagina_atual=${pagina}&qtd_tentativa=0&status=Concluido`);
+        if (responseAtualiza.status === 200) {
+          escreverLog(`Sincronização lote pagina ${pagina} CONCLUIDO`);
+        }
+      }
+
+      // escreverLog(`Sincronização imóvel ${codigo} CONCLUIDO`);
+    } else {
+      console.error(`Erro ao buscar detalhes do imóvel:`);
+    }
+  } catch (error) {
+    console.error('Erro ao sincronizar todos os imóveis:', error);
   }
 }
 
@@ -683,5 +829,5 @@ app.listen(PORTA, HOST, async () => {
   escreverLog(mensagem);
   console.log(mensagem);
   // Inicia a sincronização após o servidor subir
-  // await sincronizarTodosOsImoveis(); 
+  // await sincronizarTodosOsImoveisFluxoCompleto(); 
 });
