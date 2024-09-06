@@ -408,10 +408,10 @@ app.get('/imoveis', async (req, res) => {
       "paginacao": { "pagina": page, "quantidade": process.env.QTD_POR_PAGINA }
     };
     const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
-    escreverLog('URL da requisição:', url); 
+    escreverLog(`URL da requisição: ${url}`); 
     const response = await axios.get(url);
-    escreverLog('Status da resposta:', response.status); 
-    escreverLog('Cabeçalhos da resposta:', response.headers); 
+    escreverLog(`Status da resposta: ${response.status}`); 
+    escreverLog(`Cabeçalhos da resposta: ${response.headers}`); 
     if (response.status === 200) {
       res.json(response.data);
     } else {
@@ -515,10 +515,32 @@ app.get('/campos', async (req, res) => {
 });
 
 //Fluxo Limpeza
-app.get('/resultado-consulta', async (req, res) => {
+app.get('/teste-google', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id_imovel FROM imo_imovel');
-    res.json(rows); // Envia o resultado da consulta como JSON
+    axios.get('https://google.com')
+    .then(response => {
+      console.log(`Resposta do Google: ${response.status}`);
+      res.json(response.data); // Envia o resultado da consulta como JSON
+    })
+    .catch(error => {
+      console.error('Erro ao acessar o Google:', error);
+    });
+  } catch (error) {
+    console.error('Erro ao executar a consulta:', error);
+    res.status(500).send('Erro ao executar a consulta.');
+  }
+});
+
+app.get('/teste-vista', async (req, res) => {
+  try {
+    axios.get('https://clie1076-rest.vistahost.com.br/imoveis/listar?key=f00b6cf16ed3ad0c796e38e552e5dab3&pesquisa=%7B%22fields%22%3A%5B%22Edificio%22%2C%22Categoria%22%2C%22Descricao%22%2C%22Status%22%2C%22Dormitorios%22%2C%22Vagas%22%2C%22BanheiroSocialQtd%22%2C%22AreaPrivativa%22%2C%22Cidade%22%2C%22UF%22%2C%22Bairro%22%2C%22Endereco%22%2C%22TipoEndereco%22%2C%22Latitude%22%2C%22Longitude%22%2C%22ValorVenda%22%2C%22ValorLocacao%22%2C%22Situacao%22%2C%22Finalidade%22%2C%22FotoDestaque%22%2C%22DataAtualizacao%22%2C%22Caracteristicas%22%2C%22ValorIptu%22%2C%22ValorCondominio%22%2C%22DistanciaMar%22%2C%22ExibirNoSite%22%5D%2C%22order%22%3A%7B%22DataAtualizacao%22%3A%22desc%22%7D%2C%22paginacao%22%3A%7B%22pagina%22%3A1%2C%22quantidade%22%3A%2250%22%7D%7D&showtotal=1')
+    .then(response => {
+      console.log(`Resposta do vistahost:${response.status}`); 
+      res.json(response.data); // Envia o resultado da consulta como JSON
+    })
+    .catch(error => {
+      console.error('Erro ao acessar o Google:', error);
+    });
   } catch (error) {
     console.error('Erro ao executar a consulta:', error);
     res.status(500).send('Erro ao executar a consulta.');
