@@ -408,7 +408,10 @@ app.get('/imoveis', async (req, res) => {
       "paginacao": { "pagina": page, "quantidade": process.env.QTD_POR_PAGINA }
     };
     const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showtotal=1`;
+    escreverLog('URL da requisição:', url); 
     const response = await axios.get(url);
+    escreverLog('Status da resposta:', response.status); 
+    escreverLog('Cabeçalhos da resposta:', response.headers); 
     if (response.status === 200) {
       res.json(response.data);
     } else {
@@ -508,6 +511,62 @@ app.get('/campos', async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar campos:', error);
     res.status(500).send('Erro interno no servidor');
+  }
+});
+
+//Fluxo Limpeza
+app.get('/resultado-consulta', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id_imovel FROM imo_imovel');
+    res.json(rows); // Envia o resultado da consulta como JSON
+  } catch (error) {
+    console.error('Erro ao executar a consulta:', error);
+    res.status(500).send('Erro ao executar a consulta.');
+  }
+});
+
+app.get('/ids-imoveis', async (req, res) => {
+  try {
+      const pesquisa = {
+        "fields": [
+          "Codigo"
+        ],
+        "paginacao": {
+          "pagina": 1,
+          "quantidade": 50
+        }
+      };
+
+      const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showSuspended=1`;
+      // const response = await axios.get(url);
+      // console.log(url);
+      // if (response.status === 200) {
+      //     console.log(`200`);
+      //     res.json({ ...response.data });
+      //   }
+      // res.json(response.data); 
+      axios.get(url)
+        .then(response => {
+          if (response.status === 200) {
+            console.log(response.data); // Dados dos imóveis
+            res.json({ ...response.data });
+          } else {
+            console.error('Erro na requisição:', response.status, response.statusText);
+          }
+        })
+        .catch(error => {
+          console.error('Erro ao buscar imóveis:', error);
+        });
+
+    // const url = `${baseUrlApi}/resultado-consulta`;
+    // const response = await axios.get(url);
+    // if (response.status === 200) {
+    //   console.log(`200`);
+    // }
+    // res.json(response.data); 
+  } catch (error) {
+    console.error('Erro ao buscar IDs de imóveis:', error);
+    res.status(500).send('Erro ao buscar IDs de imóveis.');
   }
 });
 
