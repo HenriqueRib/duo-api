@@ -17,7 +17,9 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
     - `/desativar-imovel/:id`: Força retirar do site 
     - `/controle-sincronizar`: Mostra o status do fluxo de sincronização 
     - `/atualiza-controle-sincronizar`: Atualiza status do fluxo de sincronização
-    
+    - `ids-imoveis` : Chama a rota imioveis/list com o parametro showSuspended=1 . Com isso é possivel idenficar tos os ids 
+    - `remover_imoveis_suspended/:codigo` : Rota se certifica que o imovel esta suspenso mesmo e retira do site. 
+    - `remover_imoveis_suspended_todos` : Rota com o fluxo para retirar todos os imoveis suspenso do site.
 
 ## Acesso às Imagens
 

@@ -445,7 +445,7 @@ app.get('/imoveis/:codigo', async (req, res) => {
     const response = await axios.get(url);
 
     if (response.status === 200) {
-      await sincronizarImovel(response.data);
+      // await sincronizarImovel(response.data);
       res.json({ ...response.data });
     } else {
       const errorMessage = `Erro ao buscar detalhes do imóvel: ${response.status} - ${response.statusText}`;
@@ -514,7 +514,7 @@ app.get('/campos', async (req, res) => {
   }
 });
 
-//Fluxo Limpeza
+//Teste do servidior
 app.get('/teste-google', async (req, res) => {
   try {
     escreverLog(`Iniciando rota teste-google`);
@@ -552,48 +552,118 @@ app.get('/teste-vista', async (req, res) => {
   }
 });
 
+//Fluxo Limpeza
 app.get('/ids-imoveis', async (req, res) => {
   try {
+    const quantidadePorPagina = 50; 
+    let pagina = 1;
+    let todosOsIds = [];
+    let continuarBuscando = true;
+
+    while (continuarBuscando) {
       const pesquisa = {
-        "fields": [
-          "Codigo"
-        ],
-        "paginacao": {
-          "pagina": 1,
-          "quantidade": 50
-        }
+        "fields": ["Codigo"],
+        "paginacao": { "pagina": pagina, "quantidade": quantidadePorPagina }
       };
 
       const url = `${baseUrl}/listar?key=${apiKey}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}&showSuspended=1`;
-      // const response = await axios.get(url);
-      // console.log(url);
-      // if (response.status === 200) {
-      //     console.log(`200`);
-      //     res.json({ ...response.data });
-      //   }
-      // res.json(response.data); 
-      axios.get(url)
-        .then(response => {
-          if (response.status === 200) {
-            console.log(response.data); // Dados dos imóveis
-            res.json({ ...response.data });
-          } else {
-            console.error('Erro na requisição:', response.status, response.statusText);
-          }
-        })
-        .catch(error => {
-          console.error('Erro ao buscar imóveis:', error);
-        });
+      const response = await axios.get(url);
 
-    // const url = `${baseUrlApi}/resultado-consulta`;
-    // const response = await axios.get(url);
-    // if (response.status === 200) {
-    //   console.log(`200`);
-    // }
-    // res.json(response.data); 
+      if (response.status === 200) {
+        const imoveis = response.data;
+        const idsPagina = Object.values(imoveis).map(imovel => imovel.Codigo);
+        todosOsIds = todosOsIds.concat(idsPagina);
+
+        if (idsPagina.length < quantidadePorPagina) {
+          continuarBuscando = false; 
+        } else {
+          pagina++;
+        }
+      } else {
+        console.error('Erro ao buscar imóveis na página:', pagina, response.status, response.statusText);
+        continuarBuscando = false;
+      }
+    }
+    res.json(todosOsIds); 
   } catch (error) {
     console.error('Erro ao buscar IDs de imóveis:', error);
     res.status(500).send('Erro ao buscar IDs de imóveis.');
+  }
+});
+
+app.get('/remover_imoveis_suspended/:codigo', async (req, res) => {
+  try {
+    const codigoImovel = req.params.codigo;
+    const pesquisa = {
+      "fields": [
+        "Codigo",
+      ]
+    };
+
+    const url = `${baseUrl}/detalhes?key=${apiKey}&imovel=${codigoImovel}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}`;
+    const response = await axios.get(url);
+
+    if (response.status === 200) {
+      if (Object.keys(response.data).length > 0) {
+        //Significa que não esta suspend
+      } else {
+        //Significa que não esta suspend
+        const urlImovel = `${baseUrlApi}/desativar-imovel/${codigoImovel}`;
+        const responseImovel = await axios.get(urlImovel);
+        if (responseImovel.status === 200) {
+          escreverLog(`Removido do site ${codigoImovel}`);
+        } else {
+          escreverLog(`Erro ao desativar-imovel: ${codigoImovel}`); 
+        }
+      }
+      res.json({ ...response.data });
+    } else {
+      const errorMessage = `Erro ao remover_imoveis_suspended: ${response.status} - ${response.statusText}`;
+      escreverLog(errorMessage);
+      res.status(response.status).json({ error: errorMessage });
+    }
+  } catch (error) {
+    console.error('Erro ao remover_imoveis_suspended:', error);
+    escreverLog(`Erro ao remover_imoveis_suspended: ${JSON.stringify(error)}`); 
+    res.status(500).send('Erro interno no servidor');
+  }
+});
+
+app.get('/remover_imoveis_suspended_todos', async (req, res) => {
+  try {
+    escreverLog(`Iniciando remover_imoveis_suspended_todos`);
+    // const todosOsIds = await obterTodosOsIdsImoveis();
+    const responseIds = await axios.get(`${baseUrlApi}/ids-imoveis`);
+    const todosOsIds = responseIds.data;
+    escreverLog(`Total de imóveis a verificar: ${todosOsIds.length}`);
+    for (const codigoImovel of todosOsIds) {
+      escreverLog(`Verificando imóvel ${codigoImovel}...`);
+      const pesquisa = { "fields": ["Codigo"] };
+      const url = `${baseUrl}/detalhes?key=${apiKey}&imovel=${codigoImovel}&pesquisa=${encodeURIComponent(JSON.stringify(pesquisa))}`;
+      const response = await axios.get(url);
+
+      if (response.status === 200) {
+        if (Object.keys(response.data).length === 0) { // Imóvel suspenso
+          const urlImovel = `${baseUrlApi}/desativar-imovel/${codigoImovel}`;
+          const responseImovel = await axios.get(urlImovel);
+          if (responseImovel.status === 200) {
+            escreverLog(`Imóvel ${codigoImovel} removido do site.`);
+          } else {
+            escreverLog(`Erro ao desativar imóvel ${codigoImovel}:`, responseImovel.status, responseImovel.statusText);
+          }
+        } else {
+          escreverLog(`Imóvel ${codigoImovel} não está suspenso.`);
+        }
+      } else {
+        escreverLog(`Erro ao consultar imóvel ${codigoImovel}:`, response.status, response.statusText);
+      }
+    }
+    escreverLog(`Finalizado remover_imoveis_suspended_todos`);
+    res.send('Verificação de imóveis suspensos concluída. Verifique os logs para detalhes.');
+  } catch (error) {
+    console.error('Erro ao remover imóveis suspensos:', error);
+    escreverLog(`Erro ao remover imóveis suspensos: ${JSON.stringify(error)}`);
+    res.status(500).send('Erro interno no servidor');
   }
 });
 
