@@ -544,6 +544,7 @@ app.get('/teste-vista', async (req, res) => {
     })
     .catch(error => {
       escreverLog(`Erro ao acessar o vistahost:${error}`);
+      res.json(`Erro ao acessar o vistahost:${error}`);
     });
   } catch (error) {
     escreverLog('Erro ao executar a consulta:', error);
