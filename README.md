@@ -9,6 +9,7 @@ Esta API Node.js sincroniza dados de imóveis de uma fonte externa ([vistahost])
     - `/imoveis`: Lista os imóveis.
     - `/imoveis/:codigo`: Retorna detalhes de um imóvel pelo código.
     - `/sincronizar-todos`: Dispara a sincronização manual de todos os imóveis.
+    - `/sincronizar`: Dispara a sincronização manual com base na tabela imo_controle_sincronizar.
     - `/campos`: Lista os campos disponíveis na API externa.
     - `/identificar-colunas`: Lista as colunas das tabelas do banco de dados.
     - `/imo_imovel/:id`: Retorna detalhes de um imóvel pelo ID no banco de dados.
@@ -32,7 +33,7 @@ http://api.duo.imb.br:21009/imagens/{ID_IMOVEL}/{Nome_do_Edificio-separado-por-h
 **Exemplo:**
 
 ```
-http://api.duo.imb.br:21009/imagens/1599/balneario-moschen-1599-1.jpg
+http://www.api.duo.imb.br:21009/imagens/2482/american-garden-2482-27.jpg
 ```
 
 **Onde:**
@@ -41,6 +42,9 @@ http://api.duo.imb.br:21009/imagens/1599/balneario-moschen-1599-1.jpg
 - `{Nome_do_Edificio-separado-por-hifens}`: Nome do edifício com espaços substituídos por hifens.
 - `{ORDEM}`: Número sequencial da imagem dentro do imóvel.
 
+
+**Banco de dados:**
+- `{imo_arquivo.arquivo}`: 2482/american-garden-2482-27.jpg
 
 ## Pré-requisitos
 

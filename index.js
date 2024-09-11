@@ -445,7 +445,7 @@ app.get('/imoveis/:codigo', async (req, res) => {
     const response = await axios.get(url);
 
     if (response.status === 200) {
-      // await sincronizarImovel(response.data);
+      await sincronizarImovel(response.data);
       res.json({ ...response.data });
     } else {
       const errorMessage = `Erro ao buscar detalhes do imóvel: ${response.status} - ${response.statusText}`;
@@ -978,6 +978,8 @@ yargs(hideBin(process.argv))
 
 // Configurar o diretório "imagens" para servir arquivos estáticos
 app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
+
+
 
 app.listen(PORTA, HOST, async () => {
   const dataHoraAtual = new Date().toLocaleString();
